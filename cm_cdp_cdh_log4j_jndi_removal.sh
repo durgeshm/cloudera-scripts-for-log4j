@@ -141,7 +141,40 @@ function delete_jndi_from_jar_files {
 
   echo "Completed removing JNDI from nar files"
 
+  for warfile in $targetdir/**/*.war; do
+    doZip=0
 
+    rm -r -f /tmp/unzip_target
+    mkdir /tmp/unzip_target
+    unzip -qq $warfile -d /tmp/unzip_target
+    for jarfile in /tmp/unzip_target/**/*.jar; do
+      if grep -q JndiLookup.class $jarfile; then
+        # Backup file only if backup doesn't already exist
+        mkdir -p "$backupdir/$(dirname $jarfile)"
+        targetbackup="$backupdir/$jarfile.backup"
+        if [ ! -f "$targetbackup" ]; then
+          echo "Backing up to '$targetbackup'"
+          cp -f "$jarfile" "$targetbackup"
+        fi
+
+        # Rip out class
+        echo "Deleting JndiLookup.class from '$jarfile'"
+        zip -q -d "$jarfile" \*/JndiLookup.class
+        doZip=1
+      fi
+    done
+
+    if [ 1 -eq $doZip ]; then
+      echo "Updating '$warfile'"
+      pushd /tmp/unzip_target
+      zip -r -q $warfile .
+      popd
+    fi
+
+    rm -r -f /tmp/unzip_target
+  done
+
+  echo "Completed removing JNDI from war files"
 }
 
 function delete_jndi_from_targz_file {
